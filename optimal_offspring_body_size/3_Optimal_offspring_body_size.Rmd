@@ -1,0 +1,376 @@
+---
+title: "Lots of small offspring or fewer larger ones?"
+author: "Gatto, Casagrandi and De Leo (2002)"
+date: "12/26/2021"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+editor_options:
+  markdown:
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+#knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.height = 5, fig.width = 7, message = FALSE, warning = FALSE)
+```
+
+*Note*: This document in licensed under under [CC BY-SA 3.0]
+(<https://creativecommons.org/licenses/by-sa/3.0/deed.en> "CC BY-SA
+License")
+
+```{r clean, echo = FALSE}
+rm(list=ls(all=TRUE)) 
+```
+
+# The Problem
+
+A common debate on life history strategies is whether it is better
+producing many "small" offspring, each with small probability of
+surviving to the juvenile/adult stage, or fewer "large" offspring, each
+with more relevant probability of surviving.
+
+Let's try to analyze this problem by using a simple demographic model of
+a *semelparous*, asexual organism (so we do not have to deal with sex
+ratio).
+
+![](Many_smaller_or_fewer_Larger.png){width=50%}
+
+
+
+## Assumptions
+
+We are going to make the following assumptions/definitions:
+
+-   $\delta$ is the total biomass [grams] invested in reproduction;
+
+-   $x$ is the body size (biomass) of each offspring - therefore, the
+    number of offspring produced by an adult individual is:
+    ${\delta}/x$;
+
+-   Offspring with body size $x$ smaller than ${\gamma}$ [grams] are too
+    small and die;
+
+-   For offspring larger than ${\gamma}$ [grams], chance of survival
+    until maturity is an increasing and saturating function of body size
+    $x$, as described by the following function: $$
+          {\sigma} (x) = {\alpha} \cdot \frac{x - {\gamma}}{1+{\beta} * (x - {\gamma})}
+    $$
+
+Let's further assume that natural selection will favor the population
+with the highest growth rate ${\lambda}$.
+
+## Assignment
+
+Assuming that:
+
+-   $\delta = 30$ [grams]
+
+-   $\alpha = 0.1$ [grams^-1^]
+
+-   $\gamma = 1.00$ [grams]
+
+-   $\beta = 0.25$ [grams^-1^]
+
+**compute numerically (and, if you are able, analytically) the optimal
+body mass of offspring and the corresponding number of offspring**
+
+## Hint:
+
+-   First, draw qualitatively (by hand on paper!) the graph of survival $\sigma(x)$
+    as a function of offspring size $x$.
+-   Then, derive and draw the qualitative graph of the population finite
+    growth rate as a function of body mass $x$.
+-   We will then use R to *plot* the graphs of
+    $\sigma$ and $\lambda$ as a function of $x$
+-   We will find (visually, numerically and analytically) the optimal offspring body weight
+    $x_{opt}$.
+-   You will explore which of the 4 parameters (alpha, beta, gamma, delta) has
+    the most influence on $x_{opt}$.
+
+
+
+============================================================
+
+\newpage
+
+# Solutions
+
+## Qualitative solution
+
+Say $N_k$ the number of adult individuals in generation $k$.
+
+If $x$ is offspring's mean body size, the total number of offspring
+generated is equal to: $$
+    Offspring_k = \frac{\delta}{x} \cdot N_k
+$$ the number of offspring that survival to become reproductive adult in
+the generation $k+1$ is this equal to:
+
+$$
+    N_{k+1} = \sigma(x) \cdot Offspring_k 
+$$ Therefore: $$
+    N_{k+1} = \sigma(x) \cdot \frac{\delta}{x} \cdot N_k
+$$
+
+and thus, the finite growth rate of the population is equal to:
+
+$$
+    \lambda(x) = \sigma(x) \cdot \frac{\delta}{x}
+$$
+
+Therefore, the finite groth rate $\lambda$ is the product of two
+functions, $\sigma(x)$, which is an increasing and saturating function
+of body size $x$, and: $$
+\frac{\delta}{x}
+$$ which is a (hyperbolic) decreasing function of body size $x$.
+
+Note that $\lambda$ is equal to zero when $x \leq 1$ and it go to $0$
+for $x \rightarrow \infty$, it is the product of two positive function
+for $x>1$. Therefore, $\lambda$ is an humped function, which increases
+with $x$, reaches a maximum and then decreases for larger values of body
+size $x$. We thus expect that there is a value of $x$ that maximize the
+finite growth rate.
+
+Let's find this value, first graphically (by plotting the function
+$\lambda$), then numerically (and, if you want, you can try to find the
+analytic solution).
+
+## Graphical solution
+
+Let's first set model parameters and their value in R, namely:
+
+```{r }
+alpha <- 0.1
+gamma <- 1
+beta  <- 0.25
+delta <- 30
+```
+
+We could easily set a value to body size $x$ and compute the fraction
+$\sigma$ of offspring of body size $x$ surviving to maturity, for
+instance:
+
+```{r }
+x  <- 4 * gamma; x  
+
+sigma5 <- alpha*((x - gamma)/(1+beta*(x - gamma))); sigma5
+```
+
+As the number of offspring is:
+
+```{r }
+delta/x
+```
+
+therefore, the fine growth rate is
+
+```{r }
+(delta/x) * sigma5
+```
+
+Of course, this is not a really efficient use of R. We can set a range
+of values of body size $x$, between, say, 0 and 10 times $\gamma$ (we
+could go higher, up to 30 gram, but as we will see, this is more than
+enough)
+
+```{r }
+size <- seq(gamma/100, 10 * gamma, by = gamma/100) # we do not start from zero
+head(size)  # check the last elements of this vector  
+```
+
+and then we can define a function to compute sigma ($\sigma(x)$) as
+function of body size $x$, namely:
+
+```{r }
+f.sigma <-  function(x) {
+   ifelse(x<=gamma, 0, alpha*((x-gamma)/(1+beta*(x-gamma)))) 
+} 
+
+
+sigma  <-  f.sigma(size)
+
+tail(sigma)
+```
+
+Now, let's plot ($\sigma(x)$) as a functyion body size $x$:
+
+```{r }
+par(mfrow=c(1,1))
+plot(sigma ~ size, type="l", cex=0.5, xlim=c(0,max(size)), xlab = 'body size x [grams]',
+                         ylab = 'annual survival', lwd = 3)
+abline(v=gamma, lty = 3) 
+```
+
+Now, let's compute the average number of offspring with body size $x$
+and plot is on semi-log scale:
+
+```{r }
+f.offspring.no  <-  function (x) delta/x  
+
+offspring.no  <- f.offspring.no(size); head(offspring.no)
+
+plot(offspring.no ~ size, cex=0.5, type="l", log = 'y')
+```
+
+Now, we can finally compute the finite growth rate $\lambda$ as product
+of number of offspring on body size $x$ and their survival $\sigma$ to
+reproduction, which in r is particularly easy to do, as the
+multiplication operator "\*" multiply the two vectors element by
+element, that is:
+
+```{r }
+lambda <- offspring.no * sigma  
+
+head(sigma)
+head(offspring.no)
+head(lambda)
+
+plot(lambda ~ size, cex=0.5, type="l")
+abline(h=1, lty = 3) # add a horizontal line for lambda=1 (by the way, why lambda=1?)
+```
+
+Therefore, we can see that $\lambda$ is indeed an unimodal function of
+body size $x$ with a maximum for a body size between 2.5 and 3.5
+
+We can find numerically the value of $x$ that maximizes $\lambda$ as
+follows:
+
+```{r }
+size[which(lambda == max(lambda))] 
+```
+
+## Analytic solution
+
+Note that this value is probably the right one (as we designed the
+exercise so that $\lambda$ is maximum for $x=3$). Yet, this result
+depends upon how finely we set the vector *size* of body sizes with R's
+*seq()* function
+
+We can derive analytically the optimal body size by noting that when
+$\lambda$ reaches its maximum value, there its first derivative is equal
+to zero by definition.
+
+Therefore, we should find the value of $x$ for which:
+
+$$
+ \frac{d{\lambda(x)}}{dx} \equiv  0
+$$
+
+As $\lambda(x) = \sigma(x) \cdot Offspring(x)$ (actually, let's rename
+$G(x) \equiv Offspring(x)$, this means:
+
+$$
+ \frac{d{\lambda(x)}}{dx} = \frac{d{\sigma(x) \cdot G(x)} }{dx} = \frac{d{\sigma(x)} }{dx} \cdot G(x) + \sigma(x) \cdot \frac{d{G(x)} }{dx} \equiv  0
+$$ or also: $$
+{\alpha} \frac{1 + \beta (x - \gamma) - (x - \gamma) \beta}{(1 + \beta(x - \gamma))^2} \cdot \frac{\delta}{x} + \alpha \frac{x - \gamma}{1+\beta * (x - \gamma)} \cdot  \left( -\frac{\delta}{x^2} \right)  \equiv  0
+$$ which can be simplified to: $$
+ {\beta}(x - \gamma)^2 = \gamma
+$$ and, thus, the optimal body size is: $$
+ x_0 = \gamma + \sqrt{\frac{\gamma}{\beta}}
+$$
+
+Therefore,
+
+```{r }
+x.opt = gamma + sqrt(gamma/beta); x.opt
+```
+
+# some minor (but cool) addition
+
+## Using R for symbolic calculation
+
+In case you might not remember all the derivative rules, R can help you
+by doing symbolic calculation, and here below we will show you how.
+
+Specifically, we will make R to compute the derivative of lambda with
+respect to body size and then use *uniroot()* to find where the
+derivative is equal to zero.
+
+First we transform the function to compute $\lambda$ to a "text
+expression" in R, namely:
+
+```{r }
+lambda.expr <- expression(alpha*((x-gamma)/(1+beta*(x-gamma)))*delta/x)
+lambda.expr 
+```
+
+Then, we simply ask R to compute the derivative for us:
+
+```{r }
+lambda.der <- D(lambda.expr, "x")
+
+lambda.der
+```
+
+The result is a text expression as well, so we need to tell R to
+*evaluate* it for any value of model parameters and for the specific
+value of body size, namely:
+
+```{r }
+f.lambda.der = function(x) eval(lambda.der) 
+f.lambda.der
+```
+
+Let's see whether the numerical derivative is indeed quite close to
+zero:
+
+```{r }
+f.lambda.der(x.opt)
+```
+
+Let's compute and then plot the derivative of $\lambda$ as a function of
+body size $x$
+
+```{r }
+lambda.der.v = sapply(size, f.lambda.der)
+plot(lambda ~ size, cex=0.5, col="blue")
+abline(v=c(gamma, 20*gamma), h=0, lty = 3)
+abline(v=x.opt, col="red")
+```
+
+## Plot all three graphs on the same plot
+
+plot several function each with its scale on the same panel par(mfrow
+=c(1,1), mar=c(6,4,1,8)) set margin size to accomodate two y axes on
+right
+
+```{r }
+par(mfrow =c(1,1), mar=c(6,4,1,8)) # set margin size to accomodate two y axes on right
+plot(sigma ~ size, type="l", cex=0.5, col="green", lwd=2, xlim=c(0,10*gamma))
+leg.txt <- c("Sigma", "Offspring number", "Lambda")
+legend(0.0004, 0.000004, leg.txt, col=c("green", "red", "blue"), lty=1, 
+       lwd=2, bty="n")
+
+
+par(new=T)  #par adds new data to prior plot without overwriting it
+plot(offspring.no ~ size, axes = F, cex=0.5, col="red", ylab="", lwd=2, 
+     type="l", xlim=c(0,10*gamma))
+
+axis(4)  #position 4 is the right side of the quartz window
+mtext("Offspring number", side = 4, line=-2) # 'line' adjusts position of axis label
+
+par(new=T)  #par adds new data to prior plot without overwriting it
+plot(lambda ~ size, axes = F, cex=0.5, col="blue", type = 'l', ylab="", lwd=2,  
+     xlim=c(0,10*gamma))
+
+axis(4, line=4)  #position 4 is the right side of the quartz window
+mtext("Lambda", side = 4, line=6)  
+
+abline(v=x.opt, col="black", lty=2)
+```
+
+## Find optimal body size by using R's uniroot() function
+
+Lastly, I just want to note that in case we were unable to derive the
+analytic solution, we could still find the solution numerically by using
+R's *uniroot()* function to find the value of $x$ for which the
+derivative of $\lambda$ is equal to zero, namely:
+
+```{r }
+obs <- uniroot(f.lambda.der, c(gamma, 10*gamma), tol = 10^-12)  
+opt.body.size = obs[1];opt.body.size 		
+```
+# Asssignment
+-   Discuss the relationship between optimal body size $x_{opt}$ and $\gamma$ and $\beta$. 
+-   In terms of life history traits, what is the meaning/your interpretation of these relationships?  

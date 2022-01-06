@@ -1,0 +1,216 @@
+---
+title: "Introduction to R"
+author: "Giulio A. De Leo"
+date: "12/22/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+#knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.height = 3, fig.width = 5, message = FALSE, warning = FALSE)
+
+```
+
+# Goals
+
+Here we will use *R* and *RMarkdown* to simulate Malthusian growth for a population of lionfish *Pterois miles* and *P. volitans* in the Caribbean.
+
+This exercise is intended also to be a smooth introduction to R if you are not familiar with this programming environment.
+
+
+We will thus learn how to simulate the dynamics for a population for which the finite growth rate is known and to plot the outcome in natural and semi-log scale.
+
+We will also learn how to estimate the mean time the population takes on average to double in size
+
+
+# Background information
+
+Excerpt from [Morris et al. 2011](https://link.springer.com/article/10.1007%2Fs10530-010-9786-8 "Link to the original paper on Springer web site")
+
+> Invasive lionfish, *Pterois miles* and *P. volitans*, are now established along the southeast coast of the United States and parts of the Caribbean (Morris et al. 2009; Schofield et al. 2009). Lionfish represent the first marine reef fish invader to this region and are thought to have been released intentionally by aquarists over many years (Courtenay 1995; Morris and Whitfield 2009). The rapidity of the lionfish invasion in the Western North Atlantic and Caribbean is unprecedented among marine fishes. Not only are invasive lionfish now widely distributed geographically, in some locations that are one of the most abundant reef fishes (Green and Coˆte´ 2009). Lionfish have the potential to significantly affect the trophic structure of reef communities (Albins and Hixon 2008). As generalist piscivores (Morris and Akins 2009), lionfish could compete with native reef fishes of the snapper-grouper complex, a group of fishes that have been heavily exploited (Coleman et al. 1999). This competition could hamper current efforts to rebuild overfished stocks.
+
+![](LionFish_from_nas.er.usgs.gov_Don_DeMaria.jpg)
+
+(credit:Don DeMaria, source: <https://nas.er.usgs.gov/queries/FactSheet.aspx?speciesID=963>, see more pictures on USGS website)
+
+Quoting from *Whitfield et al.* (2007, [Biological Invasions](https://link.springer.com/article/10.1007%2Fs10530-006-9005-9 "Link to the paper on Springer web site") ):
+
+> More recently the Indo-Pacific lionfish (*Pterois volitans/* *P. miles* complex) has become established along the southeastern region of the United States. A combination of verified and unverified reports suggest that the lionfish distribution may be continuous from Miami, Florida north to Cape Hatteras, North Carolina (26\_ N--35\_ N), in water depths of 30--100 m, including Bermuda (personal communication, Judi Clee, Sarah Manuel), (Whitfield et al. 2002; Hare and Whitfield 2003; Semmens et al. 2004; Ruiz-Carus et al. 2006). Juveniles have also been sporadically reported off the coast of New Jersey, Long Island and Rhode Island, during late summer and fall, but overwintering survival is not expected due to cold water temperatures (Kimball et al. 2004). These data and observations strongly suggest that lionfish are firmly established, reproducing (Ruiz-Carus et al. 2006) and their population is growing along the Atlantic coast. Nevertheless, this apparent increase in lionfish distribution could be a function of greater public awareness and reporting. Quantitative abundance measures are necessary to understand the true status of the lionfish population and to evaluate potential impacts to native communities.
+
+![](Lionfish_home_range_nas.er.usgs.gov.jpg)
+
+(*source: <https://nas.er.usgs.gov/queries/FactSheet.aspx?speciesID=963>*)
+
+# Solution
+
+### a bit of healthy housekeeping :)
+First, it is always a good habit to clear R's memory. This time, we do it explicitly, we won't show it in following *RMarkdown* exercises, but it will be there.
+
+```{r clean}
+rm(list=ls(all=TRUE)) 
+```
+
+The growth rate of lion fish was derived from *Morris et al.* (2011, [*Biological Invasions*](https://link.springer.com/article/10.1007%2Fs10530-010-9786-8 "Link to the original paper on Springer web site") ):
+
+```{r}
+lambda  <- 1.12
+```
+
+Assume the current number of individuals per hectare is still very low, at the beginning of the invasion, for instance:
+
+```{r}
+N0  <- 2.0 
+```
+
+We can use R to calculate lionfish density in the next generation:
+
+```{r}
+N2  <- lambda * N0; N2
+```
+
+Needless to say, this is certainly not an efficient use of R, we can do better than this: for instance, compute lionfish density in 10 generations:
+
+```{r}
+N10 <- (lambda^10)*N0; sprintf("%.2f", N10) # print only two significant digits
+```
+
+In this case we have the analytic formula to derive lionfish density at any future generation. In general, however, model complexity requires to work with a recursive formula, one step at a time. Let's see how we do it. We need to write a "for loop" to compute number of individuals in the population at time *t+1* as a function of population at time *t*.
+
+Let's first set time horizon (for instance, 20 years):
+
+```{r}
+tmax <-  20 
+```
+
+We also create a vector to store pop abundance at time *t*, with length *tmax*, namely:
+
+```{r}
+nt <- numeric(tmax) 
+```
+
+Let's assign the initial population density to the first element of this vector
+
+```{r}
+nt[1] <- N0 
+```
+
+
+### for loop to simulate the dynamics with a recrusive equation
+
+Here is the simple *for* loop
+
+```{r}
+for (t in 1:(tmax-1)) {
+
+  nt[t+1] <- lambda * nt[t]
+	
+}
+```
+
+We can print on screen the first elements of the vector
+
+```{r}
+sprintf("%.2f", head(nt))
+```
+
+and the last ones"
+
+```{r}
+sprintf("%.2f", tail(nt))
+```
+
+...or extract any element form the vector at a time point
+
+```{r}
+sprintf("%.2f", c(nt[1], nt[5], nt[15]))
+
+```
+
+### simple plot in R by using ggplot2()
+
+Anyway, it might be useful just to plot the result, i.e., population density vs time. To do so, we need to (1) install the ggplo2 package (if you haven't install it yet), (2) load the package, (3) create a *data frame*, as shown hereafter:
+
+```{r}
+if (!require("ggplot2")) install.packages("ggplot2")
+library(ggplot2)
+
+df <- data.frame(years=1:tmax, density=nt)
+```
+
+and then design and render the plot:
+
+```{r}
+ggplot() +
+geom_step(data=df,  mapping=aes(x=years, y=nt)) +  # set the set wise geometry
+geom_point(data=df, mapping=aes(x=years, y=nt ), color="red") + #the red points
+geom_line(data=df, mapping=aes(x=years, y=nt ), color = "darkgrey", linetype=3) + # a dotted line
+  ggtitle("Population trend") +  # the tite
+  xlab("Time [years]") + ylab("Density [ind./ha]") # the axis label
+
+```
+
+
+## Question: how does the population trajectory look like in a semi-logarithmic scale?
+
+On a semi-log scale
+
+```{r}
+ggplot() +
+geom_step(data=df,  mapping=aes(x=years, y=nt)) +
+geom_point(data=df, mapping=aes(x=years, y=nt ), color="red") +
+geom_line(data=df, mapping=aes(x=years, y=nt ), color = "darkgrey", linetype=3) +
+  ggtitle("Population trend") +
+  xlab("Time [years]") + ylab("Density [ind./ha]") +
+   scale_y_log10() 
+```
+
+# How log does the population take to double in size?
+
+To compute the expected number of generations the population is projected to take on average to double in size, we can use the following equation:
+
+
+$$
+N_{x} =  2N_0 = {\lambda}^x  N_0
+$$
+where the generation $x$ is the unknown parameter. Solving this equation is quite trivial, we can first divide each member of the equation by $N_0$ (>0):
+
+$$
+2 = {\lambda}^x
+$$
+
+and then take the natural logarithm:
+
+$$
+\log 2 = \log {\lambda}^x = x * \log({\lambda})
+$$
+
+which can be solved for *x* as:
+
+$$
+x = \frac{\log 2}{\log({\lambda})}
+$$
+
+Therefore, the doubling time \[years\] is:
+
+```{r}
+DT <- log(2)/log(lambda)
+sprintf("%.1f", DT)
+
+```
+
+# Assignment
+
+According to Whitfield et al. (2007, *Biological Invasions*), lionfish had reached a population density \~21.2 individuals/ha in shallower North Caroline coastal surveys at the time they conducted their study.
+
+![](Whitfield_et_al2007_Fig3.png)
+from *Whitfield et al.* (2007, [Biological Invasions](https://link.springer.com/article/10.1007%2Fs10530-006-9005-9 "Link to the paper on Springer web site") )
+
+
+
+
+# Question: 
+## Based on what we know about the finite growth rate of the population, how long did the population take to increase from 2 to 22.1ind/ha?
+
+```{r}
+# report the code and answer here
+```

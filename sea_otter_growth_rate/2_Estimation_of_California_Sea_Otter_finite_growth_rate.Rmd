@@ -1,0 +1,163 @@
+---
+title: "Estimation of California Sea Otter's finite rate of growth"
+author: "Giulio A. De Leo"
+date: "12/26/2021"
+output:
+  pdf_document:
+    df_print: kable
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+#knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.height = 3, fig.width = 5, message = FALSE, warning = FALSE)
+
+```
+
+*Note*: This document in licensed under under [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/deed.en "CC BY-SA Licence")
+
+```{r clean, echo = FALSE}
+rm(list=ls(all=TRUE)) 
+```
+
+The goal of this exercise is to estimate the finite growth rate of the sea otter population in the Monterey bay from the historical time series of population abundance. Specifically, wit this exercise, we will learn how:
+
+-   Read the data from a file
+-   Plot the data as a function of time in a natural and logarithmic scale
+-   Estimate the finite growth rate of this population
+-   Estimate how many years it takes for the population to double
+
+## Premise\*
+
+\*excerpt from Ludina and Levin (1988)
+
+> The California sea otter has recovered only recently (and dramatically) from years of overharvesting, although the population is still considered vulnerable to significant pollution events (VanBlaricom and Jameson 1982). In the eastern Pacific Ocean, fur traders hunted the sea otter to near extinction in the early 1900s. When relict populations were protected in 1911 by international treaty, the California sea otter was thought to be extinct (Kenyon 1969; Wild and Ames 1974). However, in 1914, a small population of about 50 otters was discovered near Point Sur on the central California coast (Bryant 1915; Bolin 1938; Wild and Ames 1974). Since that time, the otters have increased their population size and expanded their range to reoccupy portions of the habitat from which they had been extirpated (fig. 1; Kenyon 1969; Peterson and Odemar 1969; Wild and Ames 1974).
+
+![from Ludina and Levin (1988)](Fig_1_Lubina_Levin_1988_California_Sea_Otter.png)
+
+In the original paper, the authors gathred data from published and unpublished information graciously provided by the California Department of Fish and Game (CFG), the U.S. Fish and Wildlife Service (USFWS), and the Institute of Marine Sciences at the University of California, Santa Cruz (Carlisle 1966; Peterson and Odemar 1969; Wild and Ames 1974; Geibel and Miller 1984; Riedman and Estes, MS; E. Ebert, pers. comm.). These data reflect the historical process of sea otter range expansion through 1984. The data are of three types:
+
+-   descriptions of the extent of the otters' range over time
+
+-   estimates of the total otter population size
+
+-   and CFG flight reports of aerial surveys containing distributional data.
+
+For the sake of this exercise, we will use the data on population size from 1914 to 1974.
+
+## Exercise
+
+
+Let's read the file and, as it is a short one, just print screen its content:
+
+```{r}
+df = as.data.frame(read.table("data/California_Sea_otters.csv", sep=",", header=T, na.string="-9.99"))
+head(df)
+```
+
+To plot the result, let's load the *ggplot2()* package
+
+```{r}
+if (!require("ggplot2")) install.packages("ggplot2")
+library(ggplot2)
+```
+
+and then "build up" the plot:
+
+```{r}
+ggplot() +
+geom_point(data=df, mapping=aes(x=year, y=abundance ), color="red") + #the red points
+geom_line( data=df, mapping=aes(x=year, y=abundance ), color = "darkgrey", linetype=3) + # a dotted line
+  ggtitle("California Sea Otters population trend") +  # the tite
+  xlab("Time [years]") + ylab("Abundance") # the axis label
+
+```
+
+To estimate average growth rate, we assume here Malthusian growth. Accordingly:
+
+$$
+N_{t+1} = {\lambda}N_t
+$$ which lead to:
+
+$$
+N_{t} = N_0 {\lambda}^t
+$$
+
+Let's take the logarithm of both the righ and left hand sides: $$
+{\log N_{t}} = {\log N_0 {\lambda}^t} = {\log N_0} + {\log {\lambda}^t} = {\log N_0} + t \cdot {\log {\lambda}}
+$$
+
+which is the equation of a straight line:
+
+$$
+ y = a + b \cdot x
+$$
+
+with $y \equiv {\log N_{t}}$, $a \equiv {\log N_{0}}$, $b \equiv {\log {\lambda}}$, and $x \equiv t$.
+
+In *R* it is straightforward to estimate the finite growth rate through linear regression, namely:
+
+```{r LinReg}
+LogModel=lm(data = df, log(abundance)~year); 
+summary(LogModel)
+```
+
+We can extract intercept and slope
+
+```{r}
+coef(LogModel)
+```
+
+Now, assign the slope to a new parameter, say *igr* (*instantaneous growth rate*):
+
+```{r}
+igr <- coef(LogModel)[2]; igr
+```
+
+derive confident intervals
+
+```{r}
+confint(LogModel, 'year', level=0.95)
+```
+
+... and the the corresponding finite growth rate
+
+```{r}
+lambda <- exp(igr); lambda
+```
+
+Here we create a new data frame to plot the results
+
+```{r}
+
+temp.mat <-  predict(LogModel, newdata = df, interval = "confidence"); as.data.frame(temp.mat)
+conf.int <-  data.frame(year = df$year, abundance = df$abundance, fit = exp(fitted(LogModel)), 
+                        lwr = exp(temp.mat[,'lwr']), upr = exp(temp.mat[,'upr']) ); conf.int
+
+```
+
+```{r}
+
+ggplot(conf.int, aes(year,abundance)) + geom_point(color = 'red') +
+  geom_line(aes(year, fit), size = 1, linetype = 1) + # fitted lines
+  geom_ribbon(aes(ymin = lwr, ymax = upr), alpha=0.4) # confidence intervals
+
+```
+
+Now, compute the number of years this population took to double in size
+
+```{r}
+# report the script and result here
+
+```
+
+## Assignment
+
+Estimate population growth rate for the grayseal puppy abundance in Sable island, use the following file in the "data" folder:
+
+-    Grey_seal_puppy_production_Sable_Island_time_trend_data.csv
+
+Likewise for the loggerhead turtle population in the Great Barrier Reef in Australia, use the following file in the "data" folder:
+
+-    australian_gbr_Loggerhead_sea_turtle_data.csv
