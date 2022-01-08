@@ -1,104 +1,214 @@
 ################################################################################
-##' @title Sea otters
+##' @title Estimating sea otter population growth rate
 ##' @author Robin Elahi
 ##' @contact elahi@stanford.edu
 ##' @date 2022-01-06
 ##' @log 
 ################################################################################
 
+##' Example from Stanford course "Quantitative Methods in Marine Ecology and Conservation"
+##' 2022: taught by Giulio DeLeo, Maurice Goodman, Richard Grewelle
+
 ##### PACKAGES, DATA #####
 library(tidyverse)
 library(here)
-here()
 
 theme_set(theme_bw(base_size = 10) + 
             theme(panel.grid = element_blank(), 
                   strip.background = element_blank())
 )
 
-d <- read.csv(here("sea_otter_growth_rate/data/California_Sea_otters.csv"))
+d <- read_csv(here("sea_otter_growth_rate", "data", "California_Sea_otters.csv"))
 d
 
-##### LIONFISH #####
+##### ESTIMATE AVERAGE SEA OTTER POPULATION GROWTH RATE, ASSUMING MALTHUSIAN GROWTH #####
 
-lambda <- 1.12 # Morris et al. 2011, Bioinvasions
-N <- 21.1 # individuals per hectare; Whitfield et al. 2007
-
-## Use for loop to:
-
-# Calculate lionfish density 1 year from now
-lambda * N
-
-# Calculate lionfish density 100 years from now
-
-# Vector of population size
-n_years <- 101 # 100 years from the start, in this case start = 1
-n_vec <- vector(length = n_years)
-n_vec[1] <- N
-
-for(i in 2:n_years){
-  n_vec[i] <- lambda * n_vec[i - 1]
-}
-
-n_vec[101]
-
-lambda^(100) * N
-
-d <- tibble(year = 1:n_years, n = n_vec)
-
-# How many years will it take for the population to double?
-d # approximately in year 7 (so 6 years later)
-log(2) / log(lambda) # exact answer, 6.1 years
-
-# 10-fold increase 
-d %>% print(n = 30) #will take about 21 years
-
-# Plot the results as a function of time (natural scale and semi-log scale)
-
-# Natural scale
+# Plot
 d %>% 
-  ggplot(aes(x = year, y = n)) + 
-  geom_point()
-
-# Semi-log scale
-d %>% 
-  ggplot(aes(x = year, y = log(n))) + 
-  geom_point()
-
-## Question from lab
-# Based on what we know about the finite growth rate of the population, how long did the population take to increase from 2 to 22.1ind/ha?
-
-N0 <- 2
-tmax <- 50
-nt <- numeric(tmax)
-nt[1] <- N0
-
-for (t in 1:(tmax - 1)) { 
-  nt[t + 1] <- lambda * nt[t]
-}
-
-nt
-d <- tibble(year = 1:tmax, density = nt)
-d %>% 
-  ggplot(aes(x = year, y = density)) + 
+  ggplot(aes(x = year, y = abundance)) + 
   geom_step() + 
   geom_point(color = 'red') + 
   geom_line(color = "darkgray", linetype = 3) + 
-  labs(x = "Time (years)", y = "Density (ind. / ha)")
+  labs(x = "Time (years)", y = "Abundance") 
 
-# Semi-log scale
+# We would like to estimate lambda
+# and add a trendline and confidence interval to the above plot
+
+# Estimate lambda using linear model with log-transformed abundance
+d <- d %>% 
+  mutate(log_abundance = log(abundance))
+
+m1 <- lm(log_abundance ~ year, data = d)
+summary(m1)
+
+# Parameter coefficients
+coef(m1)
+
+# Assign slope to an object (igr; instantaneous growth rate)
+igr <- coef(m1)[2]
+igr
+
+# Take the exponent to get lambda (i.e., finite growth rate)
+lambda <- exp(igr)
+lambda
+
+# Extract confidence intervals
+confint(m1, 'year', level = 0.95)
+
+# Create a new dataframe for predictions and plotting
+# Would like to make a prediction every year (this is optional; can also use the original data, d)
+d_new <- tibble(year = min(d$year):max(d$year)) 
+d_new
+
+# Get predictions from model
+d_pred <- predict(m1, newdata = d_new, interval = "confidence") 
+d_pred
+glimpse(d_pred) # not a dataframe yet
+
+d_pred2 <- d_new %>% 
+  mutate(fit = exp(d_pred[, 'fit']), 
+         lower = exp(d_pred[, 'lwr']), 
+         upper = exp(d_pred[, 'upr']))
+
+d_pred2
+
+# Plot
+d_pred2 %>% 
+  ggplot(aes(x = year, y = fit)) + 
+  geom_line(size = 1) + 
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.3) + 
+  geom_point(data = d, aes(x = year, y = abundance), color = 'red') + 
+  labs(x = "Time (years)", y = "Abundance") 
+
+##### EXERCISE: GRAY SEAL PUPS #####
+
+# Change the input data, rename to match the otter data
+d <- read_csv(here("sea_otter_growth_rate", "data", "Grey_seal_puppy_production_Sable_Island_time_trend_data.csv"))
+d
+
+d <- d %>% 
+  mutate(year = Year)
+
+# Plot
 d %>% 
-  ggplot(aes(x = year, y = density)) + 
+  ggplot(aes(x = year, y = abundance)) + 
   geom_step() + 
   geom_point(color = 'red') + 
   geom_line(color = "darkgray", linetype = 3) + 
-  labs(x = "Time (years)", y = "Density (ind. / ha)") + 
-  scale_y_log10()
+  labs(x = "Time (years)", y = "Abundance") 
 
-d %>% print(n = 25)
+# We would like to estimate lambda
+# and add a trendline and confidence interval to the above plot
 
-# Create multiplier
-mult <- 22.1 / 2
-mult
+# Estimate lambda using linear model with log-transformed abundance
+d <- d %>% 
+  mutate(log_abundance = log(abundance))
 
-log(mult) / log(lambda)
+m1 <- lm(log_abundance ~ year, data = d)
+summary(m1)
+
+# Parameter coefficients
+coef(m1)
+
+# Assign slope to an object (igr; instantaneous growth rate)
+igr <- coef(m1)[2]
+igr
+
+# Take the exponent to get lambda (i.e., finite growth rate)
+lambda <- exp(igr)
+lambda
+
+# Extract confidence intervals
+confint(m1, 'year', level = 0.95)
+
+# Create a new dataframe for predictions and plotting
+# Would like to make a prediction every year (this is optional; can also use the original data, d)
+d_new <- tibble(year = min(d$year):max(d$year)) 
+d_new
+
+# Get predictions from model
+d_pred <- predict(m1, newdata = d_new, interval = "confidence") 
+d_pred
+glimpse(d_pred) # not a dataframe yet
+
+d_pred2 <- d_new %>% 
+  mutate(fit = exp(d_pred[, 'fit']), 
+         lower = exp(d_pred[, 'lwr']), 
+         upper = exp(d_pred[, 'upr']))
+
+d_pred2
+
+# Plot
+d_pred2 %>% 
+  ggplot(aes(x = year, y = fit)) + 
+  geom_line(size = 1) + 
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.3) + 
+  geom_point(data = d, aes(x = year, y = abundance), color = 'red') + 
+  labs(x = "Time (years)", y = "Abundance") 
+
+##### EXERCISE: LOGGERHEAD TURTLES #####
+
+# Change the input data, rename to match the otter data
+d <- read_csv(here("sea_otter_growth_rate", "data", "australian_gbr_Loggerhead_sea_turtle_data.csv"))
+d
+
+d <- d %>% 
+  mutate(abundance = count)
+
+# Plot
+d %>% 
+  ggplot(aes(x = year, y = abundance)) + 
+  geom_step() + 
+  geom_point(color = 'red') + 
+  geom_line(color = "darkgray", linetype = 3) + 
+  labs(x = "Time (years)", y = "Abundance") 
+
+# We would like to estimate lambda
+# and add a trendline and confidence interval to the above plot
+
+# Estimate lambda using linear model with log-transformed abundance
+d <- d %>% 
+  mutate(log_abundance = log(abundance))
+
+m1 <- lm(log_abundance ~ year, data = d)
+summary(m1)
+
+# Parameter coefficients
+coef(m1)
+
+# Assign slope to an object (igr; instantaneous growth rate)
+igr <- coef(m1)[2]
+igr
+
+# Take the exponent to get lambda (i.e., finite growth rate)
+lambda <- exp(igr)
+lambda
+
+# Extract confidence intervals
+confint(m1, 'year', level = 0.95)
+
+# Create a new dataframe for predictions and plotting
+# Would like to make a prediction every year (this is optional; can also use the original data, d)
+d_new <- tibble(year = min(d$year):max(d$year)) 
+d_new
+
+# Get predictions from model
+d_pred <- predict(m1, newdata = d_new, interval = "confidence") 
+d_pred
+glimpse(d_pred) # not a dataframe yet
+
+d_pred2 <- d_new %>% 
+  mutate(fit = exp(d_pred[, 'fit']), 
+         lower = exp(d_pred[, 'lwr']), 
+         upper = exp(d_pred[, 'upr']))
+
+d_pred2
+
+# Plot
+d_pred2 %>% 
+  ggplot(aes(x = year, y = fit)) + 
+  geom_line(size = 1) + 
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.3) + 
+  geom_point(data = d, aes(x = year, y = abundance), color = 'red') + 
+  labs(x = "Time (years)", y = "Abundance") 
+
