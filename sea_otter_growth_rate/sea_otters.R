@@ -6,8 +6,8 @@
 ##' @log 
 ################################################################################
 
-##' Example from Stanford course "Quantitative Methods in Marine Ecology and Conservation"
-##' 2022: taught by Giulio DeLeo, Maurice Goodman, Richard Grewelle
+##' Exercise from the Stanford course Quantitative Methods for Marine Ecology and Conservation (BIOHOPK143), 
+##' taught by Giulio DeLeo, Maurice Goodman, and Richard Grewelle. 
 
 ##### PACKAGES, DATA #####
 library(tidyverse)
