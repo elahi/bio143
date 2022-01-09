@@ -74,3 +74,13 @@ abline(h = 1, lty = 3)
 
 # Find the value of x which maximizes lambda
 size_vec[which(lambda_vec == max(lambda_vec))]
+
+##### ANALYTICAL SOLUTION #####
+
+# See notes for analytical solution, here we substitute our values:
+x_opt = gamma + sqrt(gamma / beta)
+x_opt
+
+##### USING R FOR SYMBOLIC CALCULATION #####
+
+##### ALL THREE FUNCTIONS ON THE SAME PLOT #####
