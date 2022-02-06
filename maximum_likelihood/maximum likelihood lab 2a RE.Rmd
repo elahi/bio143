@@ -17,8 +17,6 @@ if (!require("tidyverse")) install.packages("tidyverse"); library(tidyverse)
 if (!require("emdbook")) install.packages("emdbook"); library(emdbook)
 ```
 
-TEST
-
 Aiming to characterize the trade-off between growth and survival, Vonesh and Bolker (2005) use experimental manipulations to estimate the effects of prey (tadpole) size and prey density on the rate of consumption by aquatic predators (a species of dragonfly, the "keyhole glider"). Here, we'll model the relationship between tadpole density and predation by fitting two forms of the functional response using their experimental data.
 
 Recall that a **functional response** defines the relationship between prey density or number (the independent variable) and the rate of prey consumption by a predator (the dependent variable) - so, our x variable is the number of tadpole larvae in each tank, and our y variable is the number of tadpoles eaten over the study period. We have a fixed number of predators in each tank (3 dragonflies), and a fixed amount of time (14 days) that we observe our tadpoles for.
