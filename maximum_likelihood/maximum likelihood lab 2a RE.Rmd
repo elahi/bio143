@@ -95,7 +95,35 @@ nll_holling2 <- function(par, P, t, N0, Nc) {
 
 When we ran a linear regression on Monday, we didn't pay much attention to the initial parameter values that we passed to `optim`. However, for more complex functions, they can matter quite a bit - if the initial values are too off the mark, the optimization algorithm may never find the maximum likelihood estimates. So, let's try to make a visual guess as to what the initial values should be.
 
-Taking a look at the Holling Type II equation, we can see that for small values of $N_0$ (the initial prey density), the number of prey eaten *per predator, and per unit time* (i.e. ignoring the $P$ and $t$ parameters) is close to $a$ (the attack rate) and as $N_0$ increases, the number of prey eaten by each predator reaches an asymptote of $1/h$. [I DON'T SEE THIS]
+Taking a look at the Holling Type II equation, we can see that for small values of $N_0$ (the initial prey density), the number of prey eaten *per predator, and per unit time* (i.e. ignoring the $P$ and $t$ parameters) is close to $a$ (the attack rate). We can base this on intuition: at low prey density, the per-prey predation rate is limited only by the rate at which the predators attack prey. 
+
+We can also evaluate the derivative of the function at $N = 0$ --> this gives us $a$. 
+
+$$
+\begin{align*}
+  H(N) &= \frac{a N}{1 + a h N} \\
+  \frac{dH}{dN} &= \frac{a / (1 + a h N) - a N \times a H}{(1 + a h N)^2} \\
+  \frac{dH}{dN} \bigg|_{N = 0} &=  \frac{a / 1 - 0 \times ah}{1} = a \\
+\end{align*}
+$$
+
+We can visualize this in R by:
+
+  - Writing an expression for the function
+  - Taking the derivative of the expression (using R's symbolic capabilities)
+  - Evaluating the derivative for a given range of $x$ values and arbitrary $a$ and $h$
+  - Plotting the result
+
+```{r}
+holling2_exp <- expression((a * x) / (1 + a * h * x))
+dhdx <- D(holling2_exp, "x")
+x <- seq(0, 10, by = 0.01)
+dx <- eval(dhdx, envir = list(x = x, a = 0.5, h = 2))
+dx
+plot(dx ~ x, type = "l")
+```
+
+That helps us with an initial value for $a$. What about $h$? As $N_0$ increases, the number of prey eaten by each predator reaches an asymptote of $1/h$. We can see this directly from the Holling II function.  
 
 Let's plot the number of prey eaten, divided by the number of predators $P$ and the study time $t$, as a function of the initial prey density: 
 
@@ -104,23 +132,7 @@ ReedfrogFuncresp$p_killed <- ReedfrogFuncresp$Killed / (3 * 14)
 
 ReedfrogFuncresp %>% 
   ggplot(aes(Initial, p_killed)) + 
-  geom_point() + 
-  scale_x_continuous(limits = c(0, 2000))
-```
-
-```{r}
-ReedfrogFuncresp$p_killed <- ReedfrogFuncresp$Killed / (3 * 14)
-
-ReedfrogFuncresp %>% 
-  ggplot(aes(Initial, Killed)) + 
-  geom_point() + 
-  stat_function(fun = holling2, 
-                args = list(#N0 = ReedfrogFuncresp$Initial, 
-                            a = 0.1, 
-                            h = 0.85, 
-                            P = 3, 
-                            t = 14))
-  scale_x_continuous(limits = c(0, 2000))
+  geom_point() 
 ```
 
 The asymptote looks to be around 0.85, and we can guess $a$ by fitting a linear regression on smaller values of the initial population size, holding the intercept at 0 (since predators can't consume prey that aren't there):
@@ -133,6 +145,22 @@ initial_lm <- lm(
 
 coef(initial_lm)
 ```
+
+```{r}
+# But plugging the MLE values and expanding the x-axis shows that we are far from the asymptote
+ReedfrogFuncresp$p_killed <- ReedfrogFuncresp$Killed / (3 * 14)
+
+ReedfrogFuncresp %>% 
+  ggplot(aes(Initial, Killed)) + 
+  geom_point() + 
+  stat_function(fun = holling2, 
+                args = list(a = 0.0125, 
+                            h = 0.697, 
+                            P = 3, 
+                            t = 14)) + 
+  scale_x_continuous(limits = c(0, 2000))
+```
+
 
 # Maximum likelihood estimates
 
@@ -199,7 +227,7 @@ par_grid %>%
 
 Based on the shape of the likelihood surface, do you think a normal approximation for the confidence intervals on $a$ and $h$ would be appropriate? Why or why not?
 
-> 
+> The normal distribution assumes symmetric uncertainty, but the surface plot suggests that there is some asymmetry around the MLE. If it were symmetric I would expect to see ovals or ellipses around the MLE (the white dot). 
 
 # Confidence intervals
 
@@ -233,23 +261,44 @@ for (i in 1:n_boot) {
 
 Plot histograms of these samples. The attack rate samples are in the first column, and the handling time samples are in the second. What do you notice about the distributions of each of these parameters?
 
-> 
+> Both parameters are skewed right. 
 
 ```{r}
 ## YOUR CODE HERE
+head(holling_boot)
+par(mfrow = c(1,2))
+hist(holling_boot[,1])
+hist(holling_boot[,2])
 ```
 
 Obtain 95% confidence intervals using (1) the bootstrap distribution, and (2) the MLE and Fisher standard errors. How do these compare?
 
-> 
+> The Fisher CIs are narrower than the bootstrap CIs. 
 
 ```{r}
 ## YOUR CODE HERE - bootstrap confidence intervals
+gamma <- 0.05 ## 95% confidence interval
+a_CI <- quantile(holling_boot[,1], c(gamma/2, 1 - gamma/2))
+h_CI <- quantile(holling_boot[,2], c(gamma/2, 1 - gamma/2))
+
+CI_boot <- cbind(a_CI, h_CI)
 ```
 
 ```{r}
 ## YOUR CODE HERE - normal approximation with fisher SE
+gamma <- 0.05 ## 95% confidence interval
+
+a_CI <- qnorm(c(gamma/2, 1 - gamma/2), mean = holling_mle$par[1], sd = se[1])
+h_CI <- qnorm(c(gamma/2, 1 - gamma/2), mean = holling_mle$par[2], sd = se[2])
+
+CI_fisher <- cbind(a_CI, h_CI)
 ```
+
+```{r}
+CI_boot
+CI_fisher
+```
+
 
 Now, let's use our samples of $a$ and $h$ to draw confidence bands for the number of prey eaten. To do that, we'll loop over the rows of the matrix containing our sample estimates, and for each we'll store a fitted line by applying the `holling2` function we defined earlier on to initial prey densities up to 100:
 
