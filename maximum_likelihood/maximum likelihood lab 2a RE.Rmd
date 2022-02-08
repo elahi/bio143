@@ -346,8 +346,49 @@ ReedfrogFuncresp %>%
 
 Use a likelihood ratio test to assess the null hypothesis that the handling time $h$ is equal to 1 (i.e., that it takes a dragonfly about 1 day to eat/digest a tadpole). Refer back to the first assignment for how to do this - it involves obtaining a maximum likelihood estimate for $a$ while holding $h$ constant.
 
+> LRT suggests there is no difference between the full and reduced model (P = 0.15)
+
 ```{r}
 ## YOUR CODE HERE
+## Negative log likelihood - reduced
+nll_holling2_reduced <- function(par, P, t, N0, Nc) {
+  
+  a <- par[1] ## attack rate
+  h <- 1 ## handling time is 1
+  
+  if (a >= 0 & h >= 0) {
+    
+    p_sim = holling2(N0, a, h, P, t)/N0
+    return(-sum(dbinom(Nc, prob = p_sim, size = N0, log = TRUE)))
+  } else {
+    return(1e5) # return a large number for nonsensical parameter values
+  }
+  
+}
+
+holling_mle_reduced <- optim(
+  par = c(a = 0.014), 
+  fn = nll_holling2_reduced, 
+  N0 = ReedfrogFuncresp$Initial, 
+  Nc = ReedfrogFuncresp$Killed, 
+  P = 3, 
+  t = 14, 
+  #method = "Brent", 
+  hessian = TRUE
+)
+
+full <- holling_mle$value
+reduced <- holling_mle_reduced$value
+
+### calculate test statistic
+## YOUR CODE HERE
+chi2_val <- 2 * (reduced - full)
+chi2_val
+
+### p-value
+## YOUR CODE HERE
+pchisq(q = chi2_val, df = 1, lower.tail = FALSE)
+
 ```
 
 ## 2. The Rogers functional response
@@ -359,8 +400,7 @@ N = N_0 \left( 1 - e^{a(Nh - PT)} \right)
 $$
 From Chapter 8 of Ben Bolker's book: 
 
-The Rogers random-predator equation (8.1.4) contains N on both the left- and right-hand sides of the equation; traditionally, one has had to use iterative numerical methods to compute the function (Vonesh and Bolker,
-2005). However, the Lambert W function (Corless et al., 1996), which gives the solution to the equation $W(x)e^{W(x)} = x$, can be used to compute the Rogers equation efficiently: in terms of the Lambert W the Rogers equation is:
+The Rogers random-predator equation (8.1.4) contains N on both the left- and right-hand sides of the equation; traditionally, one has had to use iterative numerical methods to compute the function (Vonesh and Bolker, 2005). However, the Lambert W function (Corless et al., 1996), which gives the solution to the equation $W(x)e^{W(x)} = x$, can be used to compute the Rogers equation efficiently: in terms of the Lambert W the Rogers equation is:
 
 $$
 N = N_0 - \frac{W(ahN_0 e^{-a(PT - hN_0)})}{ah}
@@ -392,6 +432,21 @@ Obtain maximum-likelihood estimates for $a$ and $h$ under the Rogers model (Use 
 
 ```{r}
 ## YOUR CODE HERE
+holling_mle
+
+rogers_mle <- optim(
+  par = c(a = 0.013, h = 0.7), 
+  fn = nll_rogers, 
+  N0 = ReedfrogFuncresp$Initial, 
+  Nc = ReedfrogFuncresp$Killed, 
+  P = 3, 
+  t = 14, 
+  hessian = TRUE
+)
+
+rogers_mle$par
+holling_mle$par
+
 ```
 
 We can use the Akaike Information Criterion (AIC) to compare these models. We prefer the model with the lowest AIC, but only if that model has an AIC value at least two units smaller than the other models (i.e., if two models are within 2 AIC of each other, neither one is considered to fit the data substantially better). The equation for AIC is: 
@@ -403,11 +458,18 @@ where $k$ is the number of parameters in the model (2, for both models), and $- 
 
 ```{r}
 ## YOUR CODE HERE
+k <- 2
+holling_aic <- 2*k - 2*holling_mle$value
+rogers_aic <- 2*k - 2*rogers_mle$value
+
+holling_aic
+rogers_aic
+
 ```
 
 Does AIC prefer either model? Based on AIC and what you know of the study, which model would you prefer?
 
-> 
+> AIC does not prefer either model. 
 
 
 
