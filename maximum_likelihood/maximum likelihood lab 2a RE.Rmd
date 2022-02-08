@@ -40,7 +40,8 @@ data(ReedfrogFuncresp)
 
 ReedfrogFuncresp %>% 
   ggplot(aes(Initial, Killed)) + 
-  geom_point()
+  geom_point() + 
+  labs(y = "Number of tadpoles killed", x = "Initial number of tadpoles")
 ```
 
 # The Holling Type II response
