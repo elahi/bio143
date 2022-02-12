@@ -50,5 +50,9 @@ m_st_c <- gam(flounder ~ s(E_km, N_km, k = 100) + s(year, k = 10) +
 ## Compare models
 AIC(m_c, m_s, m_s_t, m_st, m_st_c)
 
-##
+## Model fit
 
+
+## Plotting
+# scale = 0 allows different y axes for models with multiple smooths
+plot(m_c, scale = 0)
