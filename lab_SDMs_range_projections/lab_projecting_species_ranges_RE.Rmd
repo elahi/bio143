@@ -216,9 +216,21 @@ m10 <- gam(
   data = d, family = binomial(link = "logit")
 )
 
-AIC(m1, m2, m3, m4, m5, m6, m7, m8, m9, m10)
+# All, but linear; DOES NOT CONVERGE
+m11 <- gam(
+  present ~ s(lon, lat, k = 100) + bio1 + bio12 + bio15 + bio8 + bio17, 
+  data = d, family = binomial(link = "logit")
+)
 
-m_best <- m8
+# All environmental, but linear
+m11 <- gam(
+  present ~ bio1 + bio12 + bio15 + bio8 + bio17, 
+  data = d, family = binomial(link = "logit")
+)
+
+AIC(m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11)
+
+m_best <- m10
 
 ```
 
@@ -230,20 +242,26 @@ m_best <- m8
 
 ```{r}
 gam.check(m_best)
+plot(m_best)
 
 m_best2 <- gam(
-  present ~ s(lon, lat, k = 100) + s(bio15) + s(bio8) + s(bio17, k = 75), 
+  present ~ s(lon, lat, k = 100) + s(bio1) + s(bio12) + s(bio15) + s(bio8) + s(bio17, k = 20), 
   data = d, family = binomial(link = "logit")
 )
 
-gam.check(m_best2)
+gam.check(m_best2) # can't get the edf below the boundary; pvals remain low
+
+plot(m_best2)
 ```
 
 If you decided to increase k for any of these smooth terms, do so until the p-value for that term is non-significant. Provide the code for your final model below, if different from your previous one:
 
+> I could not get the p-value to be non-sig; so I'll just use the original best model. 
+
 ```{r}
-thrasher_gam <- gam(
-  ## YOUR CODE HERE  
+m_best <- gam(
+  present ~ s(lon, lat, k = 100) + s(bio1) + s(bio12) + s(bio15) + s(bio8) + s(bio17), 
+  data = d, family = binomial(link = "logit")
 )
 ```
 
@@ -251,7 +269,18 @@ thrasher_gam <- gam(
 
 **Question 4:** Use `dismo::evaluate()` to plot the ROC curve and extract the AUC value. Does your AUC score suggest that the model is able to accurately discriminate between presences and absences?
 
+```{r}
+fitted <- as.numeric(predict(m_best, type = "response"))
+fitted_p <- fitted[d$present == 1]
+fitted_a <- fitted[d$present == 0]
+
+ROC <- dismo::evaluate(fitted_p, fitted_a)
+plot(ROC, "ROC")
+```
+
+
 > **Answer:**
+> Yes, the model is excellent; AUC is > 0.9. 
 
 ## Present
 
@@ -270,24 +299,34 @@ The most straightforward way to characterize the niche, in terms of each of the 
 Let's do this for our chosen model. Use the `plot()` function to plot the smooths from the fitted model. You may also want to use the argument `scale = 0` so that the plots are not constrained to have the same y-axis, and `shade = TRUE` to produce a shaded error band (just for aesthetics, really).
 
 ```{r}
-## YOUR CODE HERE
+plot(m_best, scale = 0, shade = TRUE)
 ```
 
 One thing that makes these a little hard to understand is the scale - our model uses a logit link, so these are on the log-odds scale, but it would be much easier to interpret these on the probability (of occurrence) scale. We can back-transform these smooth curves to the probability scale by passing a transformation function to the `trans` argument. To do this, we first extract the inverse link function (which in this case is the "logistic" or "inverse logit") from the model object.
 
 ```{r}
-linkinv <- thrasher_gam$family$linkinv
+linkinv <- m_best$family$linkinv
+linkinv
 ```
 
 Now, plot the smooth functions on the transformed scale:
 
 ```{r}
 ## YOUR CODE HERE
+plot(m_best, scale = 0, shade = TRUE, trans = linkinv)
 ```
 
 **Question 5:** Interpret these plots - according to your model, what is the preferred habitat of the California thrasher?
 
 > **Answer:**
+
+> bio1: thrasher is present when annual mean temperature is below ~15 C
+> bio12: thrasher is present when annual precip is >500
+> bio15: thrasher is present when precip seasonality is >80
+> bio8: thrasher is present when mean temp of wettest quarter is >10 C
+> bio17: thrasher is present when precip of driest quarter is < 20 
+
+> To summarize: thrasher prefers cooler habitats with decent precipitation (and its variability), but does not prefer excessive precipitation during the dry months (this may reflect chaparral vegetation preferences?). 
 
 There's one problem with this, however - this model is only additive on the link scale. Once we back transform the values, the shape of these smooth terms depends on the values of the other predictors in the model. Instead, we can create a **marginal effects plot** - we plot the effects of each variable, holding the values of the other predictors at some constant value (e.g., their mean). To do this:
 
