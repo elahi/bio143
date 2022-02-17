@@ -87,10 +87,15 @@ While characterizing changes in global mean temperature as a result of increased
 Let's start by reading in the data - the thrasher occurrence data, the 1970-2000 BIOCLIM maps for California, and projections for California's climate under the SSP2-4.5 and SSP5-8.5 scenarios:
 
 ```{r}
-thrasher <- read.csv("thrasher_occurrence_data.csv")
-bioclim <- read.csv("bioclim_1970-2000.csv")
-ssp245 <- read.csv("bioclim_2081-2100_ss245.csv")
-ssp585 <- read.csv("bioclim_2081-2100_ss585.csv")
+library(here)
+```
+
+
+```{r}
+thrasher <- read.csv(here("lab_SDMs_range_projections", "thrasher_occurrence_data.csv"))
+bioclim <- read.csv(here("lab_SDMs_range_projections", "bioclim_1970-2000.csv"))
+ssp245 <- read.csv(here("lab_SDMs_range_projections", "bioclim_2081-2100_ss245.csv"))
+ssp585 <- read.csv(here("lab_SDMs_range_projections", "bioclim_2081-2100_ss585.csv"))
 ```
 
 ## Choose an initial set of predictors
@@ -117,21 +122,11 @@ d <- thrasher %>% dplyr::select(lon, lat, present, bio1, bio12, bio15, bio8, bio
 d_env <- d %>% dplyr::select(bio1, bio12, bio15, bio8, bio16, bio17)
 
 library(ggcorrplot)
-pairs()
 cor_mat <- d_env %>% cor()
 ggcorrplot(cor_mat, hc.order = FALSE, type = "lower",
            lab = TRUE, show.legend = T, 
            lab_size = 3, legend.title = "", 
            tl.cex = 8) 
-
-# Remove bio12
-d_env <- d %>% dplyr::select(bio1, bio15, bio8, bio16, bio17)
-cor_mat <- d_env %>% cor()
-ggcorrplot(cor_mat, hc.order = FALSE, type = "lower",
-           lab = TRUE, show.legend = T, 
-           lab_size = 3, legend.title = "", 
-           tl.cex = 8) 
-
 ```
 
 I will drop bio16 (precip of wettest quarter). 
@@ -339,7 +334,64 @@ There's one problem with this, however - this model is only additive on the link
 > **Answer:**
 
 ```{r}
-## YOUR CODE HERE
+logit2prob <- function(logit){
+  odds <- exp(logit)
+  prob <- odds / (1 + odds)
+  return(prob)
+}
+```
+
+
+```{r}
+summary(m_best)
+plot(m_best)
+
+# Get median values for all predictors
+d_summary <- d %>% 
+  gather(key = predictor, value = value, lon, lat, bio1:bio17) %>% 
+  group_by(predictor) %>% 
+  summarise(median = median(value)) %>% 
+  spread(key = predictor, value = median)
+d_summary
+
+# Make range of values for predictor of interest
+# Choose bio1 (annual mean temperature)
+x_range <- range(d$bio1)
+x_new <- seq(x_range[1], x_range[2], length.out = 100)
+
+d_new <- tibble(lon = -118, 
+                lat = 36, 
+                #lon = d_summary$lon, 
+                #lat = d_summary$lat, 
+                bio1 = x_new, 
+                bio8 = d_summary$bio8, 
+                bio12 = d_summary$bio12, 
+                bio15 = d_summary$bio15, 
+                bio16 = d_summary$bio16, 
+                bio17 = d_summary$bio17)
+
+d_pred <- predict(object = m_best, newdata = d_new, se.fit = TRUE)
+
+d_pred
+
+d_new <- d_new %>% 
+  mutate(fit = d_pred$fit, 
+         se = d_pred$se.fit, 
+         upper = fit + se, 
+         lower = fit - se, 
+         fit_prob = logit2prob(fit), 
+         upper_prob = logit2prob(upper), 
+         lower_prob = logit2prob(lower)
+         )
+
+d_new %>% 
+  ggplot(aes(x = bio1, 
+             y = fit_prob)) + 
+  geom_line() + 
+  geom_ribbon(aes(ymin = lower_prob, ymax = upper_prob), alpha = 0.25) + 
+  theme_bw() + 
+  labs(x = "Annual mean temperature (C)", y = "Probability of occurrence") + 
+  ggtitle("Marginal effect (lon = -118, lat = 36, bioclim medians)")
 ```
 
 ## Present
@@ -356,20 +408,40 @@ Obtain fitted probability of occurrence values for each of these data frames:
 
 ```{r}
 ## YOUR CODE HERE
+head(bioclim)
+bioclim$fitted <- predict(m_best, newdata = bioclim, type = "response")
+ssp245$fitted <- predict(m_best, newdata = ssp245, type = "response")
+ssp585$fitted <- predict(m_best, newdata = ssp585, type = "response")
+
 ```
 
 Plot the current (1970-2000) and projected distributions (under both scenarios) using `ggplot()` and `geom_raster()`. You might also use `scale_color_viridis_c()` with `option = "magma"` - it's better looking and easier to read than the default ggplot color scheme.
 
 ```{r}
 ## YOUR CODE HERE - 1970-2000
+bioclim %>% 
+  ggplot(aes(lon, lat, fill = fitted)) + 
+  scale_fill_viridis_c(option = "magma") +
+  geom_raster() + 
+  theme_minimal()
 ```
 
 ```{r}
 ## YOUR CODE HERE - 2081-2100, SSP 2 4.5
+ssp245 %>% 
+  ggplot(aes(lon, lat, fill = fitted)) + 
+  scale_fill_viridis_c(option = "magma") +
+  geom_raster() + 
+  theme_minimal()
 ```
 
 ```{r}
 ## YOUR CODE HERE - 2018-2100, SSP 5 8.5
+ssp585 %>% 
+  ggplot(aes(lon, lat, fill = fitted)) + 
+  scale_fill_viridis_c(option = "magma") +
+  geom_raster() + 
+  theme_minimal()
 ```
 
 ## Plot distributions - presence/absence
@@ -380,20 +452,51 @@ Apply `dismo::threshold()` to the output from `dismo::evaluate()` (that you comp
 
 ```{r}
 ## YOUR CODE HERE
+dismo::threshold(ROC)
+?thresold
+my_threshold <- as.numeric(dismo::threshold(ROC)[2])
+
+bioclim <- bioclim %>% 
+  mutate(threshold = my_threshold, 
+         present = ifelse(fitted > threshold, 1, 0))
+
+ssp245 <- ssp245 %>% 
+  mutate(threshold = my_threshold, 
+         present = ifelse(fitted > threshold, 1, 0))
+
+ssp585 <- ssp585 %>% 
+  mutate(threshold = my_threshold, 
+         present = ifelse(fitted > threshold, 1, 0))
+
 ```
 
 Plot these binary presence-absence values across space (let's call this the map of suitable habitat). For aesthetic reasons, it may be good to convert the predicted presence/absence values to character strings, and manually choose colors for "present" and "absent" using the ggplot `scale_color_manual()` function.
 
 ```{r}
 ## YOUR CODE HERE - 1970-2000
+bioclim %>% 
+  ggplot(aes(lon, lat, fill = as.character(present))) + 
+  scale_fill_viridis_d() +
+  geom_raster() + 
+  theme_minimal()
 ```
 
 ```{r}
 ## YOUR CODE HERE - 2081-2100, SSP 2 4.5
+ssp245 %>% 
+  ggplot(aes(lon, lat, fill = as.character(present))) + 
+  scale_fill_viridis_d() +
+  geom_raster() + 
+  theme_minimal()
 ```
 
 ```{r}
 ## YOUR CODE HERE - 2018-2100, SSP 5 8.5
+ssp585 %>% 
+  ggplot(aes(lon, lat, fill = as.character(present))) + 
+  scale_fill_viridis_d() +
+  geom_raster() + 
+  theme_minimal()
 ```
 
 ## Present
@@ -412,12 +515,38 @@ Interpret the current range and projected range under both scenarios - do the di
 
 ```{r}
 ## YOUR CODE HERE
+bioclim_center <- bioclim %>% 
+  summarise(mean_N = weighted.mean(lat, w = present))
+
+ssp245_center <- ssp245 %>% 
+  summarise(mean_N = weighted.mean(lat, w = present))
+
+ssp585_center <- ssp585 %>% 
+  summarise(mean_N = weighted.mean(lat, w = present))
+
 ```
 
 Compute the proportion of California that we expect the California thrasher to occupy for all three fitted maps:
 
 ```{r}
 ## YOUR CODE HERE
+bioclim %>% 
+  mutate(present_cat = ifelse(present == 0, "absent", "present")) %>% 
+  count(present_cat) %>% 
+  spread(key = present_cat, value = n) %>%  
+  mutate(prop = (present / (absent + present)))
+
+ssp245 %>% 
+  mutate(present_cat = ifelse(present == 0, "absent", "present")) %>% 
+  count(present_cat) %>% 
+  spread(key = present_cat, value = n) %>%  
+  mutate(prop = (present / (absent + present)))
+
+ssp585 %>% 
+  mutate(present_cat = ifelse(present == 0, "absent", "present")) %>% 
+  count(present_cat) %>% 
+  spread(key = present_cat, value = n) %>%  
+  mutate(prop = (present / (absent + present)))
 ```
 
 ## Present
