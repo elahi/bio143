@@ -453,7 +453,7 @@ Apply `dismo::threshold()` to the output from `dismo::evaluate()` (that you comp
 ```{r}
 ## YOUR CODE HERE
 dismo::threshold(ROC)
-?thresold
+?threshold
 my_threshold <- as.numeric(dismo::threshold(ROC)[2])
 
 bioclim <- bioclim %>% 
@@ -515,13 +515,13 @@ Interpret the current range and projected range under both scenarios - do the di
 
 ```{r}
 ## YOUR CODE HERE
-bioclim_center <- bioclim %>% 
+bioclim %>% 
   summarise(mean_N = weighted.mean(lat, w = present))
 
-ssp245_center <- ssp245 %>% 
+ssp245 %>% 
   summarise(mean_N = weighted.mean(lat, w = present))
 
-ssp585_center <- ssp585 %>% 
+ssp585 %>% 
   summarise(mean_N = weighted.mean(lat, w = present))
 
 ```
